@@ -14,7 +14,7 @@ import streamlit as st
 # ---------------------------------------------------------------------------
 # Config — edit these to match your Snowflake schema
 # ---------------------------------------------------------------------------
-ORDERS_TABLE = "ANALYTICS.PUBLIC.ORDER_DETAILS"   # fully-qualified table name
+ORDERS_TABLE = "PROD_SILVER_DB.MAIN_DB.ORDER_DETAILS"   # fully-qualified table name
 ORDER_ID_COL = "ORDER_ID"
 ORDER_TS_COL = "ORDER_CREATED_AT"                 # timestamp of order placement
 SOURCE_TZ = "UTC"                                 # timezone ORDER_TS_COL is stored in
@@ -37,11 +37,23 @@ def get_connection():
         # Key-pair auth: convert the pasted PEM text into the DER bytes the connector expects
         from cryptography.hazmat.primitives import serialization
 
-        pwd = cfg.get("private_key_passphrase") or None
-        key = serialization.load_pem_private_key(
-            cfg["private_key"].strip().encode(),
-            password=pwd.encode() if pwd else None,
-        )
+        # Accept either key name for the passphrase
+        pwd = cfg.get("private_key_passphrase") or cfg.get("private_key_file_pwd") or None
+        try:
+            key = serialization.load_pem_private_key(
+                cfg["private_key"].strip().encode(),
+                password=pwd.encode() if pwd else None,
+            )
+        except TypeError:
+            raise ValueError(
+                "Your private key is encrypted. Add its passphrase to Secrets as "
+                'private_key_passphrase = "..." under [snowflake].'
+            )
+        except ValueError:
+            raise ValueError(
+                "Could not read the private key. Check the passphrase, and that the full key "
+                "(including the BEGIN/END lines) is pasted inside triple quotes."
+            )
         params["private_key"] = key.private_bytes(
             encoding=serialization.Encoding.DER,
             format=serialization.PrivateFormat.PKCS8,
