@@ -1,5 +1,0 @@
-streamlit>=1.39
-snowflake-connector-python[pandas]>=3.12
-cryptography>=42
-pandas
-altair
