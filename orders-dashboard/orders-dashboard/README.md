@@ -29,7 +29,7 @@ Before pushing: `git status` should NOT list `.streamlit/secrets.toml`.
 ## 3. Deploy on Streamlit Community Cloud
 1. Go to https://share.streamlit.io → sign in with GitHub → **Create app**.
 2. Repo: `<your-user>/orders-dashboard`, branch `main`, file `streamlit_app.py`.
-3. **Advanced settings → Secrets**: paste the filled-in contents of `secrets.toml.example`.
+3. **Advanced settings → Secrets**: paste the filled-in contents of `.streamlit/secrets.toml.example` (section `[snowflake]`).
 4. Deploy. Any later `git push` redeploys automatically.
 
 ## 4. Run locally (optional)

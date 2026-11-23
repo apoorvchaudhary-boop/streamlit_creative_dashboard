@@ -3,7 +3,7 @@ Daily Orders Dashboard
 Pulls the last 4 days of orders from Snowflake, aggregates to day level,
 and shows a day-over-day bar chart. No CSV — data is queried live.
 
-Credentials come from Streamlit secrets ([connections.snowflake]),
+Credentials come from Streamlit secrets ([snowflake] section),
 which live in Streamlit Community Cloud settings — NEVER in this repo.
 """
 
@@ -25,9 +25,40 @@ CACHE_TTL = "30m"                                 # how long query results are c
 st.set_page_config(page_title="Daily Orders", page_icon="📦", layout="centered")
 
 
+@st.cache_resource(show_spinner=False)
+def get_connection():
+    """Build a Snowflake connection purely from Streamlit secrets ([snowflake] section)."""
+    import snowflake.connector
+
+    cfg = dict(st.secrets["snowflake"])
+    params = {k: cfg[k] for k in ("account", "user", "role", "warehouse", "database", "schema") if cfg.get(k)}
+
+    if cfg.get("private_key"):
+        # Key-pair auth: convert the pasted PEM text into the DER bytes the connector expects
+        from cryptography.hazmat.primitives import serialization
+
+        pwd = cfg.get("private_key_passphrase") or None
+        key = serialization.load_pem_private_key(
+            cfg["private_key"].strip().encode(),
+            password=pwd.encode() if pwd else None,
+        )
+        params["private_key"] = key.private_bytes(
+            encoding=serialization.Encoding.DER,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+    elif cfg.get("password"):
+        params["password"] = cfg["password"]
+    else:
+        raise ValueError("Add either private_key or password to the [snowflake] secrets.")
+
+    params["client_session_keep_alive"] = True
+    return snowflake.connector.connect(**params)
+
+
 @st.cache_data(ttl=CACHE_TTL, show_spinner="Querying Snowflake…")
 def load_daily_orders() -> pd.DataFrame:
-    conn = st.connection("snowflake")
+    conn = get_connection()
     sql = f"""
         SELECT
             DATE(CONVERT_TIMEZONE('{SOURCE_TZ}', '{REPORT_TZ}', {ORDER_TS_COL})) AS ORDER_DATE,
@@ -41,7 +72,9 @@ def load_daily_orders() -> pd.DataFrame:
         GROUP BY 1
         ORDER BY 1
     """
-    df = conn.query(sql, ttl=CACHE_TTL)
+    with conn.cursor() as cur:
+        cur.execute(sql)
+        df = cur.fetch_pandas_all()
     df.columns = [c.upper() for c in df.columns]
     df["ORDER_DATE"] = pd.to_datetime(df["ORDER_DATE"])
     df["DOD_CHANGE_PCT"] = df["ORDERS"].pct_change() * 100
