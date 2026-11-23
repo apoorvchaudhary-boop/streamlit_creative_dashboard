@@ -1,0 +1,5 @@
+streamlit>=1.39
+snowflake-connector-python[pandas]>=3.12
+snowflake-snowpark-python>=1.20
+pandas
+altair

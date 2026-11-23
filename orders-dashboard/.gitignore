@@ -1,0 +1,9 @@
+# Never commit credentials
+.streamlit/secrets.toml
+*.p8
+*.pem
+.env
+
+__pycache__/
+*.pyc
+.venv/
